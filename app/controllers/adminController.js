@@ -18,22 +18,22 @@ class AdminController {
       const { name, email, role } = req.body;
 
       const existing = await User.findOne({ email });
-      if (existing) return res.redirect("back");
+      if (existing) return res.redirect("/admin/users");
 
       const generatedPassword = crypto.randomBytes(4).toString("hex");
 
       const salt = await bcryptjs.genSalt(10);
       const hashedPassword = await bcryptjs.hash(generatedPassword, salt);
 
-      const newUser = new User({
+      const user = new User({
         name,
         email,
         role,
         password: hashedPassword,
       });
-      await newUser.save();
+      await user.save();
 
-      await sendWelcomeEmail(email, generatedPassword, role);
+      await sendWelcomeEmail(user,generatedPassword);
 
       res.redirect("/admin/users");
     } catch (error) {

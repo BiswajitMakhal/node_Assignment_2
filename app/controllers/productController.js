@@ -4,7 +4,6 @@ const Category = require("../models/category");
 class ProductController {
   async listProducts(req, res) {
     try {
-      // Using Aggregation to join Category and Subcategory names
       const products = await Product.aggregate([
         {
           $lookup: {

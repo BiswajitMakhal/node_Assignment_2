@@ -3,7 +3,6 @@ const Category = require("../models/category");
 class CategoryController {
   async listCategories(req, res) {
     try {
-      // Fetch main categories and aggregate their subcategories
       const categories = await Category.aggregate([
         { $match: { parentId: null } },
         {
@@ -29,7 +28,7 @@ class CategoryController {
       res.status(500).send("Error");
     }
   }
-    async editCategory(req, res) {
+  async editCategory(req, res) {
     try {
       const category = await Category.findById(req.params.id);
       res.render("category/edit", { category });
@@ -49,13 +48,28 @@ class CategoryController {
 
   async listSubcategories(req, res) {
     try {
-      // Find all that have a parentId
-      const subcategories = await Category.find({
-        parentId: { $ne: null },
-      }).populate("parentId");
-      const mainCategories = await Category.find({ parentId: null }); // For the dropdown to add new
+      const subcategories = await Category.aggregate([
+        {
+          $match: { parentId: { $ne: null } },
+        },
+        {
+          $lookup: {
+            from: "categories",
+            localField: "parentId",
+            foreignField: "_id",
+            as: "parentCategory",
+          },
+        },
+        {
+          $unwind: "$parentCategory",
+        },
+      ]);
+
+      const mainCategories = await Category.find({ parentId: null });
+
       res.render("subcategory/list", { subcategories, mainCategories });
     } catch (error) {
+      console.log(error);
       res.status(500).send("Error");
     }
   }
@@ -74,9 +88,8 @@ class CategoryController {
 
   async deleteNode(req, res) {
     try {
-      // This works for both. If it's a main category, you might want to delete its subcategories too
-      await Category.deleteMany({ parentId: req.params.id }); // Delete child subcats first
-      await Category.findByIdAndDelete(req.params.id); // Delete the node itself
+      await Category.deleteMany({ parentId: req.params.id });
+      await Category.findByIdAndDelete(req.params.id);
       res.redirect("/categories");
     } catch (error) {
       console.log(error);
@@ -104,7 +117,6 @@ class CategoryController {
       res.status(500).send("Error");
     }
   }
-
 }
 
 module.exports = new CategoryController();

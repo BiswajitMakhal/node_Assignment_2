@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <title>Subcategories</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css">
 </head>
+
 <body>
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
         <a class="navbar-brand" href="/dashboard">Admin Panel</a>
@@ -27,9 +29,11 @@
                     <input type="text" name="name" class="form-control mr-2" placeholder="Subcategory Name" required>
                     <select name="parentId" class="form-control mr-2" required>
                         <option value="">Select Main Category</option>
-                        <% mainCategories.forEach(cat => { %>
-                            <option value="<%= cat._id %>"><%= cat.name %></option>
-                        <% }) %>
+                        <% mainCategories.forEach(cat=> { %>
+                            <option value="<%= cat._id %>">
+                                <%= cat.name %>
+                            </option>
+                            <% }) %>
                     </select>
                     <button type="submit" class="btn btn-primary">Add Subcategory</button>
                 </form>
@@ -45,18 +49,24 @@
                 </tr>
             </thead>
             <tbody>
-                <% subcategories.forEach(sub => { %>
+                <% subcategories.forEach(sub=> { %>
                     <tr>
-                        <td><%= sub.name %></td>
-                        <td><%= sub.parentId ? sub.parentId.name : 'N/A' %></td>
+                        <td>
+                            <%= sub.name %>
+                        </td>
+                        <td>
+                            <%= sub.parentCategory ? sub.parentCategory.name : 'N/A' %>
+                        </td>
                         <td>
                             <a href="/subcategories/edit/<%= sub._id %>" class="btn btn-sm btn-warning">Edit</a>
-                            <a href="/subcategories/delete/<%= sub._id %>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</a>
+                            <a href="/subcategories/delete/<%= sub._id %>" class="btn btn-sm btn-danger"
+                                onclick="return confirm('Are you sure?')">Delete</a>
                         </td>
                     </tr>
-                <% }) %>
+                    <% }) %>
             </tbody>
         </table>
     </div>
 </body>
+
 </html>
