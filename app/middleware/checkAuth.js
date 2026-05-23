@@ -1,22 +1,47 @@
 const jwt = require("jsonwebtoken");
+const User = require("../models/user");
+const bcryptjs = require("bcryptjs");
 
-const authCheck = (req, res, next) => {
-  if (req.cookies && req.cookies.userToken) {
-    jwt.verify(
-      req.cookies.userToken,
-      process.env.JWT_SECRET_KEY,
-      (err, data) => {
-        if (err) {
+const authCheck = async (req, res, next) => {
+  const accessToken = req.cookies?.userToken;
+  const refreshToken = req.cookies?.refreshToken;
+
+  if (accessToken) {
+    try {
+      const data = jwt.verify(accessToken, process.env.JWT_SECRET_KEY);
+      req.user = data;
+      return next(); 
+    } catch (err) {
+    }
+  }
+
+  if (refreshToken) {
+    try {
+      const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET_KEY);
+      const user = await User.findById(decoded.id);
+
+      if (user && user.refreshToken) {
+        const isMatch = await bcryptjs.compare(refreshToken, user.refreshToken);
+        
+        if (isMatch && user.isActive) {
+          const newAccessToken = jwt.sign(
+            { id: user._id, name: user.name, email: user.email, role: user.role },
+            process.env.JWT_SECRET_KEY,
+            { expiresIn: "15m" }
+          );
+
+          res.cookie("userToken", newAccessToken, { httpOnly: true });
+          
+          req.user = { id: user._id, name: user.name, email: user.email, role: user.role };
           return next();
         }
-        req.user = data;
-        return next();
-      },
-    );
-  } else {
-    req.user = null;
-    return next();
+      }
+    } catch (err) {
+    }
   }
+
+  req.user = null;
+  return next();
 };
 
 const authorize = (...roles) => {

@@ -32,7 +32,6 @@ class userAuthController {
       });
 
       const userData = await user.save();
-
       if (userData) {
         return res.redirect("/login/view");
       }
@@ -42,6 +41,7 @@ class userAuthController {
       return res.redirect("/register/view");
     }
   }
+
   async loginCreate(req, res) {
     try {
       const { email, password } = req.body;
@@ -57,36 +57,108 @@ class userAuthController {
         console.log("access denied");
         return res.redirect("/login/view");
       }
+
       const isMatch = await bcryptjs.compare(password, user.password);
       if (!isMatch) {
         return res.redirect("/login/view");
       }
-      const token = jwt.sign(
-        {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          role: user.role,
-        },
+
+      const accessToken = jwt.sign(
+        { id: user._id, name: user.name, email: user.email, role: user.role },
         process.env.JWT_SECRET_KEY,
-        { expiresIn: "1h" },
+        { expiresIn: "15m" }
       );
 
-      res.cookie("userToken", token);
+      const refreshToken = jwt.sign(
+        { id: user._id },
+        process.env.JWT_REFRESH_SECRET_KEY,
+        { expiresIn: "7d" }
+      );
 
-      if (user) {
-        return res.redirect("/dashboard");
-      }
-      return res.redirect("/login/view");
+      const hashedRefreshToken = await bcryptjs.hash(refreshToken, 10);
+      user.refreshToken = hashedRefreshToken; 
+      await user.save();
+
+      res.cookie("userToken", accessToken, { httpOnly: true });
+      res.cookie("refreshToken", refreshToken, { httpOnly: true });
+
+      return res.redirect("/dashboard");
     } catch (err) {
       console.log(err);
       return res.redirect("/login/view");
     }
   }
 
+  async handleRefreshToken(req, res) {
+    try {
+      const refreshToken = req.cookies.refreshToken;
+      if (!refreshToken) return res.redirect("/login/view");
+
+      let decoded;
+      try {
+        decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET_KEY);
+      } catch (err) {
+        return res.redirect("/login/view");
+      }
+
+      const user = await User.findById(decoded.id);
+      if (!user || !user.refreshToken) return res.redirect("/login/view");
+
+      const isMatch = await bcryptjs.compare(refreshToken, user.refreshToken);
+      if (!isMatch) return res.redirect("/login/view");
+
+      const newAccessToken = jwt.sign(
+        { id: user._id, name: user.name, email: user.email, role: user.role },
+        process.env.JWT_SECRET_KEY,
+        { expiresIn: "15m" }
+      );
+
+      res.cookie("userToken", newAccessToken, { httpOnly: true });
+      return res.redirect("/dashboard");
+    } catch (err) {
+      console.log(err);
+      res.redirect("/login/view");
+    }
+  }
+
   async logout(req, res) {
-    res.clearCookie("userToken");
-    return res.redirect("/login/view");
+    try {
+      const refreshToken = req.cookies.refreshToken;
+      
+      if (!refreshToken) {
+        res.clearCookie("userToken");
+        res.clearCookie("refreshToken");
+        return res.redirect("/login/view");
+      }
+
+      let decoded;
+      try {
+        decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET_KEY);
+      } catch (err) {
+        res.clearCookie("userToken");
+        res.clearCookie("refreshToken");
+        return res.redirect("/login/view");
+      }
+
+      const user = await User.findById(decoded.id);
+      if (user && user.refreshToken) {
+        const isMatch = await bcryptjs.compare(refreshToken, user.refreshToken);
+        if (isMatch) {
+          user.refreshToken = null;
+          await user.save();
+        }
+      }
+      
+      res.clearCookie("userToken");
+      res.clearCookie("refreshToken");
+      return res.redirect("/login/view");
+    } catch (err) {
+      console.log(err);
+      res.clearCookie("userToken");
+      res.clearCookie("refreshToken");
+      return res.redirect("/login/view");
+    }
   }
 }
+
 module.exports = new userAuthController();

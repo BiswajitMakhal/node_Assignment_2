@@ -9,5 +9,6 @@ Router.post("/register/create", userAuthController.registerCreate);
 Router.get("/login/view", userAuthController.loginView);
 Router.post("/login/create", userAuthController.loginCreate);
 Router.get("/logout", userAuthController.logout);
+Router.get("/refresh-token", userAuthController.handleRefreshToken);
 
 module.exports = Router;
