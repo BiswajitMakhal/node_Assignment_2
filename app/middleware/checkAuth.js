@@ -20,10 +20,18 @@ const authCheck = async (req, res, next) => {
       const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET_KEY);
       const user = await User.findById(decoded.id);
 
-      if (user && user.refreshToken) {
-        const isMatch = await bcryptjs.compare(refreshToken, user.refreshToken);
+      if (user && user.isActive && user.refreshToken && user.refreshToken.length > 0) {
         
-        if (isMatch && user.isActive) {
+        let isValidToken = false;
+        for (const hashedToken of user.refreshToken) {
+          const isMatch = await bcryptjs.compare(refreshToken, hashedToken);
+          if (isMatch) {
+            isValidToken = true;
+            break;
+          }
+        }
+        
+        if (isValidToken) {
           const newAccessToken = jwt.sign(
             { id: user._id, name: user.name, email: user.email, role: user.role },
             process.env.JWT_SECRET_KEY,

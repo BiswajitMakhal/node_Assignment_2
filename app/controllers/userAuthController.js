@@ -66,17 +66,17 @@ class userAuthController {
       const accessToken = jwt.sign(
         { id: user._id, name: user.name, email: user.email, role: user.role },
         process.env.JWT_SECRET_KEY,
-        { expiresIn: "15m" }
+        { expiresIn: "15m" },
       );
 
       const refreshToken = jwt.sign(
         { id: user._id },
         process.env.JWT_REFRESH_SECRET_KEY,
-        { expiresIn: "7d" }
+        { expiresIn: "7d" },
       );
 
       const hashedRefreshToken = await bcryptjs.hash(refreshToken, 10);
-      user.refreshToken = hashedRefreshToken; 
+      user.refreshToken.push(hashedRefreshToken);
       await user.save();
 
       res.cookie("userToken", accessToken, { httpOnly: true });
@@ -102,15 +102,25 @@ class userAuthController {
       }
 
       const user = await User.findById(decoded.id);
-      if (!user || !user.refreshToken) return res.redirect("/login/view");
+      if (!user || !user.refreshToken || user.refreshToken.length === 0) {
+        return res.redirect("/login/view");
+      }
 
-      const isMatch = await bcryptjs.compare(refreshToken, user.refreshToken);
-      if (!isMatch) return res.redirect("/login/view");
+      let isValidToken = false;
+      for (const hashedToken of user.refreshToken) {
+        const isMatch = await bcryptjs.compare(refreshToken, hashedToken);
+        if (isMatch) {
+          isValidToken = true;
+          break;
+        }
+      }
+
+      if (!isValidToken) return res.redirect("/login/view");
 
       const newAccessToken = jwt.sign(
         { id: user._id, name: user.name, email: user.email, role: user.role },
         process.env.JWT_SECRET_KEY,
-        { expiresIn: "15m" }
+        { expiresIn: "15m" },
       );
 
       res.cookie("userToken", newAccessToken, { httpOnly: true });
@@ -124,7 +134,7 @@ class userAuthController {
   async logout(req, res) {
     try {
       const refreshToken = req.cookies.refreshToken;
-      
+
       if (!refreshToken) {
         res.clearCookie("userToken");
         res.clearCookie("refreshToken");
@@ -141,14 +151,24 @@ class userAuthController {
       }
 
       const user = await User.findById(decoded.id);
-      if (user && user.refreshToken) {
-        const isMatch = await bcryptjs.compare(refreshToken, user.refreshToken);
-        if (isMatch) {
-          user.refreshToken = null;
+      if (user && user.refreshToken && user.refreshToken.length > 0) {
+        let matchedToken = null;
+        for (const hashedToken of user.refreshToken) {
+          const isMatch = await bcryptjs.compare(refreshToken, hashedToken);
+          if (isMatch) {
+            matchedToken = hashedToken;
+            break;
+          }
+        }
+
+        if (matchedToken) {
+          user.refreshToken = user.refreshToken.filter(
+            (token) => token !== matchedToken,
+          );
           await user.save();
         }
       }
-      
+
       res.clearCookie("userToken");
       res.clearCookie("refreshToken");
       return res.redirect("/login/view");
